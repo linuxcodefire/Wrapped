@@ -1,0 +1,5 @@
+Wrapped socket library, Written in VB.NET
+
+Made as a VB.NET version of SinZationalSockets, to alieviate issues caused by the different languages.
+
+Used in VB Minebot.
