@@ -1,12 +1,15 @@
 ﻿Imports System.Net
 Imports System.Net.Sockets
 Imports System.Text
+Imports System.IO
+Imports System.Security.Cryptography
 Public Class Wrapped
     Public _stream As NetworkStream
 
     Public Sub New(ByVal stream As NetworkStream)
         _stream = stream
     End Sub
+#Region "TEMP"
     '=====================================
     '            Strings
     '=====================================
@@ -338,4 +341,23 @@ Public Class Wrapped
         End While
         Return MyBytes
     End Function
+#End Region
+    Public enc As CryptoStream
+    Public dec As CryptoStream
+    Public Sub AesStream(ByVal key() As Byte, ByVal Stream As Stream)
+        Dim Basestream = Stream
+        enc = New CryptoStream(Stream, GenerateAES(key).CreateEncryptor, CryptoStreamMode.Write)
+        dec = New CryptoStream(Stream, GenerateAES(key).CreateDecryptor, CryptoStreamMode.Read)
+    End Sub
+    Private Function GenerateAES(ByVal key() As Byte) As RijndaelManaged
+        Dim ciper As RijndaelManaged = New RijndaelManaged
+        ciper.Mode = CipherMode.CFB
+        ciper.Padding = PaddingMode.None
+        ciper.KeySize = 128
+        ciper.FeedbackSize = 8
+        ciper.Key = key
+        ciper.IV = key
+        Return ciper
+    End Function
+
 End Class
