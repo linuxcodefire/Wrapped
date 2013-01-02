@@ -5,10 +5,13 @@ Imports System.IO
 Imports System.Security.Cryptography
 Public Class Wrapped
     Public _stream As NetworkStream
+    Public crypto As RSACryptoServiceProvider
+    Public EncEnabled As Boolean = False
 
     Public Sub New(ByVal stream As NetworkStream)
         _stream = stream
     End Sub
+
 #Region "TEMP"
     '=====================================
     '            Strings
@@ -34,6 +37,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                Stringbytes = crypto.Decrypt(Stringbytes, False)
+            End If
             Return Encoding.BigEndianUnicode.GetChars(Stringbytes)
         Catch ex As Exception
             Exit Function
@@ -48,6 +54,9 @@ Public Class Wrapped
             Dim final((message.Length * 2) + 1) As Byte
             Array.Copy(length, final, 2)
             Array.Copy(Encoding.BigEndianUnicode.GetBytes(message), 0, final, 2, message.Length * 2)
+            If EncEnabled Then
+                final = crypto.Encrypt(final, False)
+            End If
             _stream.Write(final, 0, final.Length)
         Catch ex As Exception
             Exit Sub
@@ -73,6 +82,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                bytes = crypto.Decrypt(bytes, False)
+            End If
             Array.Reverse(bytes) 'Converts to little-endian
             Return BitConverter.ToInt16(bytes, 0)
         Catch ex As Exception
@@ -85,6 +97,9 @@ Public Class Wrapped
         Try
             Dim bytes() As Byte = BitConverter.GetBytes(message)
             Array.Reverse(bytes) 'Convert to bigendian
+            If EncEnabled Then
+                bytes = crypto.Encrypt(bytes, False)
+            End If
             _stream.Write(bytes, 0, 2)
         Catch ex As Exception
             Exit Sub
@@ -113,6 +128,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                bytes = crypto.Decrypt(bytes, False)
+            End If
             Array.Reverse(bytes)
             Return BitConverter.ToInt32(bytes, 0)
         Catch ex As Exception
@@ -125,6 +143,9 @@ Public Class Wrapped
         Try
             Dim bytes() As Byte = BitConverter.GetBytes(number)
             Array.Reverse(bytes)
+            If EncEnabled Then
+                bytes = crypto.Encrypt(bytes, False)
+            End If
             _stream.Write(bytes, 0, 4)
         Catch ex As Exception
             Exit Sub
@@ -151,6 +172,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                bytes = crypto.Decrypt(bytes, False)
+            End If
             Array.Reverse(bytes)
             Return BitConverter.ToInt64(bytes, 0)
         Catch ex As Exception
@@ -163,6 +187,9 @@ Public Class Wrapped
         Try
             Dim bytes() As Byte = BitConverter.GetBytes(what)
             Array.Reverse(bytes)
+            If EncEnabled Then
+                bytes = crypto.Encrypt(bytes, False)
+            End If
             _stream.Write(bytes, 0, 8)
         Catch ex As Exception
             Exit Sub
@@ -191,6 +218,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                bytes = crypto.Decrypt(bytes, False)
+            End If
             Array.Reverse(bytes)
             Return BitConverter.ToDouble(bytes, 0)
         Catch ex As Exception
@@ -203,6 +233,9 @@ Public Class Wrapped
         Try
             Dim bytes() As Byte = BitConverter.GetBytes(what)
             Array.Reverse(bytes)
+            If EncEnabled Then
+                bytes = crypto.Encrypt(bytes, False)
+            End If
             _stream.Write(bytes, 0, 8)
         Catch ex As Exception
             Exit Sub
@@ -231,6 +264,9 @@ Public Class Wrapped
                     Exit While
                 End If
             End While
+            If EncEnabled Then
+                bytes = crypto.Decrypt(bytes, False)
+            End If
             Array.Reverse(bytes)
             Return BitConverter.ToSingle(bytes, 0)
         Catch ex As Exception
@@ -243,6 +279,9 @@ Public Class Wrapped
         Try
             Dim bytes() As Byte = BitConverter.GetBytes(number)
             Array.Reverse(bytes)
+            If EncEnabled Then
+                bytes = crypto.Encrypt(bytes, False)
+            End If
             _stream.Write(bytes, 0, 4)
         Catch ex As Exception
             Exit Sub
@@ -256,7 +295,11 @@ Public Class Wrapped
 
     Public Function readByte() As Byte
         Try
-            Return _stream.ReadByte()
+            If EncEnabled Then
+                Return crypto.Decrypt({_stream.ReadByte}, False)(0)
+            Else
+                Return _stream.ReadByte()
+            End If
         Catch ex As Exception
             Exit Function
         End Try
@@ -265,7 +308,11 @@ Public Class Wrapped
 
     Public Sub writeByte(ByVal mybyte As Byte)
         Try
-            _stream.WriteByte(mybyte)
+            If EncEnabled Then
+                _stream.WriteByte(crypto.Encrypt({mybyte}, False)(0))
+            Else
+                _stream.WriteByte(mybyte)
+            End If
         Catch ex As Exception
             Exit Sub
         End Try
@@ -274,7 +321,12 @@ Public Class Wrapped
 
     Public Function readSByte() As SByte
         Try
-            Return Convert.ToSByte(_stream.ReadByte())
+            If EncEnabled Then
+                Return Convert.ToSByte(crypto.Decrypt({_stream.ReadByte}, False)(0))
+            Else
+                Return Convert.ToSByte(_stream.ReadByte())
+            End If
+
         Catch ex As Exception
             Exit Function
         End Try
@@ -283,7 +335,12 @@ Public Class Wrapped
 
     Public Sub writeSByte(ByVal mybyte As SByte)
         Try
-            _stream.WriteByte(Convert.ToByte(mybyte))
+            If EncEnabled Then
+                _stream.WriteByte(crypto.Encrypt({Convert.ToByte(mybyte)}, False)(0))
+            Else
+                _stream.WriteByte(Convert.ToByte(mybyte))
+            End If
+
         Catch ex As Exception
             Exit Sub
         End Try
@@ -295,7 +352,12 @@ Public Class Wrapped
 
     Public Function readBool() As Boolean
         Try
-            Return Convert.ToBoolean(_stream.ReadByte)
+            If EncEnabled Then
+                Return Convert.ToBoolean(crypto.Decrypt({_stream.ReadByte}, False)(0))
+            Else
+                Return Convert.ToBoolean(_stream.ReadByte)
+            End If
+
         Catch ex As Exception
             Exit Function
         End Try
@@ -304,7 +366,12 @@ Public Class Wrapped
 
     Public Sub writeBool(ByVal mybool As Boolean)
         Try
-            _stream.WriteByte(Convert.ToByte(mybool))
+            If EncEnabled Then
+                _stream.WriteByte(crypto.Encrypt({Convert.ToByte(mybool)}, False)(0))
+            Else
+                _stream.WriteByte(Convert.ToByte(mybool))
+            End If
+
         Catch ex As Exception
             Exit Sub
         End Try
@@ -339,6 +406,9 @@ Public Class Wrapped
                 Exit While
             End If
         End While
+        If EncEnabled Then
+            MyBytes = crypto.Decrypt(MyBytes, False)
+        End If
         Return MyBytes
     End Function
 #End Region
