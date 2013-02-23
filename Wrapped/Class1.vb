@@ -16,7 +16,7 @@ Public Class Wrapped
     Public Sub InitEncryption(ByVal key() As Byte)
         crypto = New AesStream(_stream, key)
     End Sub
-#Region "TEMP"
+
     '=====================================
     '            Strings
     '=====================================
@@ -529,18 +529,14 @@ Public Class Wrapped
 
     Public Function readByteArray(ByVal size As Integer) As Byte()
         If EncEnabled = False Then
-            Console.WriteLine("-- Umby24 Byte Array Processor --")
-            Console.WriteLine("Size is " & size)
             Dim MyBytes(size - 1) As Byte
             Dim BytesRead1 As Integer
             BytesRead1 = _stream.Read(MyBytes, 0, size)
-            Console.WriteLine("Read " & BytesRead1)
             While 1 = 1
                 If Not BytesRead1 = size Then
                     Dim newsize As Integer = size - BytesRead1
                     Dim Bytesread As Integer
                     Bytesread = _stream.Read(MyBytes, BytesRead1 - 1, newsize)
-                    Console.WriteLine("Read(2) " & Bytesread)
                     If Not Bytesread = newsize Then
                         size = newsize
                         BytesRead1 = Bytesread
@@ -553,18 +549,14 @@ Public Class Wrapped
             End While
             Return MyBytes
         Else
-            Console.WriteLine("-- Umby24 Byte Array Processor --")
-            Console.WriteLine("Size is " & size)
             Dim MyBytes(size - 1) As Byte
             Dim BytesRead1 As Integer
             BytesRead1 = crypto.decryptStream.Read(MyBytes, 0, size)
-            Console.WriteLine("Read " & BytesRead1)
             While 1 = 1
                 If Not BytesRead1 = size Then
                     Dim newsize As Integer = size - BytesRead1
                     Dim Bytesread As Integer
                     Bytesread = crypto.decryptStream.Read(MyBytes, BytesRead1 - 1, newsize)
-                    Console.WriteLine("Read(2) " & Bytesread)
                     If Not Bytesread = newsize Then
                         size = newsize
                         BytesRead1 = Bytesread
@@ -579,5 +571,4 @@ Public Class Wrapped
         End If
 
     End Function
-#End Region
 End Class
