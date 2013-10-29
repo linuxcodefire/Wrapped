@@ -142,7 +142,7 @@ Public Class Wrapped
                 bytesRead += 1
                 varintBytes(x) = readByte()
 
-                If (varintBytes(x) And &H80) <> 1 Then
+                If (varintBytes(x) And &H80) <> 128 Then
                     Exit For
                 End If
             Next
