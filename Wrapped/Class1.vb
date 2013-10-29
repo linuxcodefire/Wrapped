@@ -13,6 +13,8 @@ Public Class Wrapped
     Public crypto As AesStream
     Public EncEnabled As Boolean = False
 
+    Public buffer() As Byte
+
     Public Sub New(ByVal stream As NetworkStream)
         _stream = stream
     End Sub
@@ -24,8 +26,29 @@ Public Class Wrapped
     '=====================================
     '            Strings
     '=====================================
-
     Public Function readString() As String
+        Try
+            Dim length As Integer = readVarInt()
+            Dim stringbytes() As Byte = readByteArray(length)
+
+            Return Encoding.UTF8.GetString(stringbytes)
+        Catch ex As Exception
+            Return ""
+        End Try
+    End Function
+    Public Sub writeString(ByVal message As String)
+        Try
+            Dim length() As Byte = getVarIntBytes(CLng(message.Length))
+            Dim final((message.Length + length.Length) - 1) As Byte
+            Array.Copy(length, final, length.Length)
+            Array.Copy(Encoding.UTF8.GetBytes(message), 0, final, length.Length, message.Length)
+
+            Send(final)
+        Catch ex As Exception
+            Exit Sub
+        End Try
+    End Sub
+    Public Function readString16() As String
         Try
             Dim length As Short = readShort()
             Dim Stringbytes() As Byte = readByteArray(length * 2)
@@ -38,7 +61,7 @@ Public Class Wrapped
 
     End Function
 
-    Public Sub writeString(ByVal message As String)
+    Public Sub writeString16(ByVal message As String)
         Try
             Dim length() As Byte = BitConverter.GetBytes(CType(message.Length, Short))
             Array.Reverse(length)
@@ -106,6 +129,90 @@ Public Class Wrapped
         End Try
 
     End Sub
+
+    '=========================
+    '     VarInt
+    '=========================
+    Public Function readVarInt() As Integer
+        Try
+            Dim varintBytes(6) As Byte
+            Dim bytesRead As Integer = 0
+
+            For x As Integer = 0 To 4
+                bytesRead += 1
+                varintBytes(x) = readByte()
+
+                If (varintBytes(x) And &H80) <> 1 Then
+                    Exit For
+                End If
+            Next
+
+            Dim temp(bytesRead - 1) As Byte
+            Array.Copy(varintBytes, temp, temp.Length)
+
+            If bytesRead > 4 Then
+                Return decodeVarInt(temp, 64)
+            ElseIf bytesRead = 4 Or bytesRead = 3 Then
+                Return decodeVarInt(temp, 32)
+            ElseIf bytesRead = 2 Then
+                Return decodeVarInt(temp, 16)
+            Else
+                Return temp(0)
+            End If
+
+        Catch ex As Exception
+            Return 0
+        End Try
+    End Function
+    Public Sub writeVarInt(ByVal number As Long)
+        Try
+            Send(getVarIntBytes(number))
+        Catch ex As Exception
+            Exit Sub
+        End Try
+    End Sub
+    Public Function getVarIntBytes(ByVal number As Long) As Byte()
+        Dim byteBuffer(10) As Byte
+        Dim position As Integer = 0
+
+        Do
+            Dim byteVal As Byte = number And &H7F
+            number >>= 7
+
+            If number <> 0 Then
+                byteVal = byteVal Or &H80
+            End If
+
+            byteBuffer(position) = byteVal
+            position += 1
+        Loop While number <> 0
+
+        Dim result(position - 1) As Byte
+        Array.Copy(byteBuffer, result, position)
+
+        Return result
+    End Function
+    Public Function decodeVarInt(ByVal bytes As Byte(), sizeBytes As Integer)
+        Dim shift As Integer = 0
+        Dim result As Long = 0
+
+        For Each byteValue As Long In bytes
+            Dim temp As Long = byteValue And &H7F
+            result = result Or (temp << shift)
+
+            If shift > sizeBytes Then
+                Throw New ArgumentOutOfRangeException("bytes", "Byte array is too large.")
+            End If
+
+            If (byteValue And &H80) <> &H80 Then
+                Return result
+            End If
+
+            shift += 7
+        Next
+
+        Throw New ArgumentException("Cannot decode varint")
+    End Function
     '===========================
     '      Long!
     '===========================
@@ -311,22 +418,50 @@ Public Class Wrapped
 
     End Function
 
-    Sub Send(ByVal Buffer As Byte())
+    Sub Send(ByVal bArray As Byte())
+        If Not buffer Is Nothing Then
+            Dim templength As Integer = buffer.Length + bArray.Length
+            Dim tempbuff(templength - 1) As Byte
 
-        If EncEnabled Then
-            crypto.encryptStream.Write(Buffer, 0, Buffer.Length)
+            Array.Copy(buffer, tempbuff, buffer.Length)
+            Array.Copy(bArray, 0, tempbuff, buffer.Length, bArray.Length)
+
+            buffer = tempbuff
         Else
-            _stream.Write(Buffer, 0, Buffer.Length)
+            buffer = bArray
         End If
-
     End Sub
 
     Sub SendByte(ByVal thisByte As Byte)
-        If EncEnabled Then
-            crypto.encryptStream.WriteByte(thisByte)
+        If Not buffer Is Nothing Then
+            Dim templength As Integer = buffer.Length + 1
+            Dim tempBuff(templength - 1) As Byte
+
+            Array.Copy(buffer, tempBuff, buffer.Length)
+            tempBuff(templength - 1) = thisByte
+
+            buffer = tempBuff
         Else
-            _stream.WriteByte(thisByte)
+            buffer = New Byte(0) {thisByte}
         End If
+    End Sub
+
+    Public Sub Purge()
+        Dim lenBytes() As Byte = getVarIntBytes(buffer.Length)
+
+        Dim templength As Integer = buffer.Length + lenBytes.Length
+        Dim tempBuff(templength - 1) As Byte
+
+        Array.Copy(lenBytes, tempBuff, lenBytes.Length)
+        Array.Copy(buffer, 0, tempBuff, lenBytes.Length, buffer.Length)
+
+        If EncEnabled Then
+            crypto.encryptStream.Write(tempBuff, 0, tempBuff.Length)
+        Else
+            _stream.Write(tempBuff, 0, tempBuff.Length)
+        End If
+
+        buffer = Nothing
     End Sub
 #End Region
 End Class
